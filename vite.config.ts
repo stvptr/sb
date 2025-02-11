@@ -3,8 +3,11 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-export default defineConfig({
-  plugins: [tailwindcss(), reactRouter(), tsconfigPaths()]
+export default defineConfig(({ command }) => ({
+  plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
+  ssr: {
+    noExternal: command === "build" ? true : undefined
+  }
   // server: {
   //   proxy: {},
   //   https: {
@@ -17,4 +20,4 @@ export default defineConfig({
   //   'Cross-Origin-Opener-Policy': 'same-origin',
   // },
   // }
-});
+}));

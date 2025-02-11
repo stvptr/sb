@@ -2,9 +2,12 @@ import { useEffect, useRef } from "react";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit/src/FitAddon";
 import "xterm/css/xterm.css";
+import { useWebContainer } from "~/web-container";
 
 const TerminalComponent = () => {
   const terminalRef = useRef<HTMLDivElement | null>(null);
+
+  const wc = useWebContainer();
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -18,10 +21,14 @@ const TerminalComponent = () => {
     let buffer = "";
 
     const resizer = () => fitAddon.fit();
-    const handleInput = (data: string) => {
+    const handleInput = async (data: string) => {
       // Handle Enter key
       if (data === "\r") {
-        terminal.writeln(`\r\nYou entered: ${buffer}`);
+        if (!wc) return;
+        const res = await wc.spawn("sh", ["-c", buffer]);
+        const output = await res.output.getReader().read();
+        terminal.writeln("");
+        terminal.write(output.value || "");
         buffer = "";
         prompt();
       } else if (data === "\u007F") {
@@ -64,7 +71,7 @@ const TerminalComponent = () => {
       terminal.dispose();
       window.removeEventListener("resize", resizer);
     };
-  }, []);
+  }, [wc]);
 
   return <div ref={terminalRef} style={{ height: 200 }}></div>;
 };

@@ -4,5 +4,17 @@ import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
-  plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
+  plugins: [tailwindcss(), reactRouter(), tsconfigPaths()]
+  // server: {
+  //   proxy: {},
+  //   https: {
+  // // openssl req -newkey rsa:2048 -nodes -keyout localhost-key.pem -x509 -days 365 -out localhost-cert.pem
+  //     key: fs.readFileSync(path.resolve(__dirname, "localhost-key.pem")),
+  //     cert: fs.readFileSync(path.resolve(__dirname, "localhost-cert.pem"))
+  //   }
+  // headers: {
+  //   'Cross-Origin-Embedder-Policy': 'require-corp',
+  //   'Cross-Origin-Opener-Policy': 'same-origin',
+  // },
+  // }
 });

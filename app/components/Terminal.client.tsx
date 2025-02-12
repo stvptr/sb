@@ -1,7 +1,6 @@
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit/src/FitAddon";
-import "xterm/css/xterm.css";
 import { useWebContainer } from "~/web-container";
 import "./xterm.css";
 

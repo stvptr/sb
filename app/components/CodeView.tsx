@@ -1,9 +1,10 @@
 import CodeEditor from "./CodeEditor";
-import { ClientOnly } from "~/components/ClientOnly";
 import Terminal from "./Terminal.client";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "~/components/ui/resizable";
-import { useRef } from "react";
-
+import { Suspense, useRef } from "react";
+import { getWebContainerP, WebContainerContext } from "~/web-container";
+import { Await } from "react-router";
+import { ClientOnly } from "~/components/ClientOnly";
 
 const CodeView = () => {
   const ref = useRef<{ resize: () => void } | null>(null);
@@ -18,18 +19,14 @@ const CodeView = () => {
       <ResizablePanel defaultSize={60}>
         <ResizablePanelGroup direction="vertical">
           <ResizablePanel defaultSize={80}>
-            <div className="p-4 h-full">
-              <ClientOnly fallback={<div>Loading editor...</div>}>
-                {() => <CodeEditor />}
-              </ClientOnly>
+            <div className="p-4 h-full w-full">
+              <CodeEditor />
             </div>
           </ResizablePanel>
           <ResizableHandle />
           <ResizablePanel defaultSize={20} onResize={() => ref.current?.resize()}>
             <div className="p-4 h-full w-full">
-              <ClientOnly fallback={<div>Loading terminal...</div>}>
-                {() => <Terminal ref={ref} />}
-              </ClientOnly>
+              <Terminal ref={ref} />
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -42,4 +39,14 @@ const CodeView = () => {
   );
 };
 
-export default CodeView;
+const CodeViewWc = () => {
+  return <ClientOnly>
+    {() => <Suspense fallback={<div>loading web container</div>}>
+      <Await resolve={getWebContainerP()}>
+        {(wc) => <WebContainerContext value={wc}><CodeView /></WebContainerContext>}
+      </Await>
+    </Suspense>}
+  </ClientOnly>;
+};
+
+export default CodeViewWc;

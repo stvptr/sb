@@ -1,5 +1,5 @@
 import { type FileSystemTree, WebContainer } from "@webcontainer/api";
-import { useSyncExternalStore } from "react";
+import { createContext, useContext } from "react";
 
 const projectFiles: FileSystemTree = {
   "index.html": {
@@ -53,11 +53,17 @@ const projectFiles: FileSystemTree = {
   }
 };
 
-let webContainer: WebContainer | null = null;
-
 const setupWebContainer = async () => {
   const wc = await WebContainer.boot();
   await wc.mount(projectFiles);
+  return wc;
+};
+
+export const WebContainerContext = createContext<WebContainer | null>(null);
+
+export const useWebContainer = () => {
+  const wc = useContext(WebContainerContext);
+  if (!wc) throw new Error("WebContainer is not mounted");
   return wc;
 };
 
@@ -68,27 +74,6 @@ export const getWebContainerP = (() => {
     webContainerP = setupWebContainer();
     const wc = await webContainerP;
     await wc.mount(projectFiles);
-    webContainer = wc;
-    emitChange();
     return wc;
   };
 })();
-
-let listeners: (() => void)[] = [];
-const emitChange = () => {
-  for (let listener of listeners) {
-    listener();
-  }
-};
-const subscribe = (listener: () => void) => {
-  getWebContainerP();
-  listeners = [...listeners, listener];
-  return () => {
-    listeners = listeners.filter(l => l !== listener);
-  };
-};
-const getWebContainer = () => webContainer;
-
-export const useWebContainer = () => {
-  return useSyncExternalStore(subscribe, getWebContainer);
-};

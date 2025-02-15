@@ -20,7 +20,7 @@ const CodeView = () => {
         <ResizablePanelGroup direction="vertical">
           <ResizablePanel defaultSize={80}>
             <div className="p-4 h-full w-full">
-              <CodeEditor />
+              <CodeEditor currentFile="script.js" />
             </div>
           </ResizablePanel>
           <ResizableHandle />

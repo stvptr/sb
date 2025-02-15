@@ -1,7 +1,7 @@
 import { type FileSystemTree, WebContainer } from "@webcontainer/api";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useSyncExternalStore } from "react";
 
-const projectFiles: FileSystemTree = {
+let fs: FileSystemTree = {
   "index.html": {
     file: {
       contents: `
@@ -17,15 +17,15 @@ const projectFiles: FileSystemTree = {
           <script src="./script.js"></script>
         </body>
         </html>
-      `
-    }
+      `,
+    },
   },
   "script.js": {
     file: {
       contents: `
         console.log('Hello from script.js');
-      `
-    }
+      `,
+    },
   },
   "style.css": {
     file: {
@@ -35,8 +35,8 @@ const projectFiles: FileSystemTree = {
           background-color: #282c34;
           color: white;
         }
-      `
-    }
+      `,
+    },
   },
   "package.json": {
     file: {
@@ -45,25 +45,23 @@ const projectFiles: FileSystemTree = {
         version: "1.0.0",
         main: "index.js",
         scripts: {
-          start: "serve ."
+          start: "node script.js",
         },
-        dependencies: {}
-      })
-    }
-  }
+        dependencies: {},
+      }),
+    },
+  },
 };
 
 const setupWebContainer = async () => {
   const wc = await WebContainer.boot();
-  await wc.mount(projectFiles);
-  return wc;
-};
-
-export const WebContainerContext = createContext<WebContainer | null>(null);
-
-export const useWebContainer = () => {
-  const wc = useContext(WebContainerContext);
-  if (!wc) throw new Error("WebContainer is not mounted");
+  await wc.mount(fs);
+  wc.fs.watch("/", { recursive: true }, async (e, f) => {
+    console.log(e, f);
+    fs = await wc.export(wc.workdir, {});
+    emitChange()
+    console.log(fs);
+  });
   return wc;
 };
 
@@ -73,7 +71,31 @@ export const getWebContainerP = (() => {
     if (webContainerP) return webContainerP;
     webContainerP = setupWebContainer();
     const wc = await webContainerP;
-    await wc.mount(projectFiles);
     return wc;
   };
 })();
+
+export const WebContainerContext = createContext<WebContainer | null>(null);
+
+export const useWebContainer = () => {
+  const wc = useContext(WebContainerContext);
+  if (!wc) throw new Error("WebContainer is not mounted");
+  return wc;
+};
+
+const getFs = () => fs;
+let listeners: (() => void)[] = [];
+const emitChange = () => {
+  for (let listener of listeners) {
+    listener();
+  }
+};
+const subFs = (listener: () => void) => {
+  listeners.push(listener);
+  return () => {
+    listeners = listeners.filter((l) => l !== listener);
+  };
+};
+export const useFs = () => {
+  return useSyncExternalStore(subFs, getFs);
+};

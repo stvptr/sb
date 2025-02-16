@@ -6,11 +6,26 @@ let fs: FileSystemTree = {};
 const setupWebContainer = async () => {
   const wc = await WebContainer.boot();
   await wc.mount(fs);
+  let exportTimeout: ReturnType<typeof setTimeout> | null = null;
   wc.fs.watch("/", { recursive: true }, async (e, f) => {
-    console.log(e, f);
-    fs = await wc.export(wc.workdir, {});
-    emitChange()
-    console.log(fs);
+    // need to debounce this or not export every time but just make the specific change
+    if (exportTimeout) clearTimeout(exportTimeout);
+    exportTimeout = setTimeout(async () => {
+      fs = await wc.export(wc.workdir, {});
+      emitChange();
+    }, 100);
+  });
+  wc.on("server-ready", (port, url) => {
+    servers = [...new Set([...servers, url])];
+    emitChangeServers();
+    console.log(port, url);
+  });
+  wc.on("port", (port, action, url) => {
+    console.log(port, action, url);
+    if (action === "close" && servers.includes(url)) {
+      servers = servers.filter((s) => s !== url);
+      emitChangeServers();
+    }
   });
   return wc;
 };
@@ -34,18 +49,36 @@ export const useWebContainer = () => {
 };
 
 const getFs = () => fs;
-let listeners: (() => void)[] = [];
+let fsListeners: (() => void)[] = [];
 const emitChange = () => {
-  for (let listener of listeners) {
+  for (let listener of fsListeners) {
     listener();
   }
 };
 const subFs = (listener: () => void) => {
-  listeners.push(listener);
+  fsListeners.push(listener);
   return () => {
-    listeners = listeners.filter((l) => l !== listener);
+    fsListeners = fsListeners.filter((l) => l !== listener);
   };
 };
 export const useFs = () => {
   return useSyncExternalStore(subFs, getFs);
+};
+
+let servers: string[] = [];
+const getServers = () => servers;
+let serversListeners: (() => void)[] = [];
+const emitChangeServers = () => {
+  for (let listener of serversListeners) {
+    listener();
+  }
+};
+const subServers = (listener: () => void) => {
+  serversListeners.push(listener);
+  return () => {
+    serversListeners = serversListeners.filter((l) => l !== listener);
+  };
+};
+export const useServers = () => {
+  return useSyncExternalStore(subServers, getServers);
 };

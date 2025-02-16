@@ -10,12 +10,15 @@ import { getWebContainerP, WebContainerContext } from "~/web-container";
 import { Await } from "react-router";
 import { ClientOnly } from "~/components/ClientOnly";
 import Preview from "~/components/Preview";
+import FilesPanel from "~/components/FilesPanel";
 
 const CodeView = () => {
   const ref = useRef<{ resize: () => void } | null>(null);
   return (
     <ResizablePanelGroup direction="horizontal">
-      <ResizablePanel defaultSize={20}>FILES</ResizablePanel>
+      <ResizablePanel defaultSize={20}>
+        <FilesPanel />
+      </ResizablePanel>
       <ResizableHandle />
       <ResizablePanel defaultSize={60}>
         <ResizablePanelGroup direction="vertical">
@@ -36,7 +39,9 @@ const CodeView = () => {
         </ResizablePanelGroup>
       </ResizablePanel>
       <ResizableHandle />
-      <ResizablePanel defaultSize={20}><Preview/></ResizablePanel>
+      <ResizablePanel defaultSize={20}>
+        <Preview />
+      </ResizablePanel>
     </ResizablePanelGroup>
   );
 };

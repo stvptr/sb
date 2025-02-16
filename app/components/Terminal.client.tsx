@@ -13,7 +13,6 @@ import "./xterm.css";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Button } from "~/components/ui/button";
 import { Plus, X } from "lucide-react";
-import type { InferRefType } from "~/lib/type-utils";
 
 const TerminalComponent = ({
   ref,
@@ -103,7 +102,7 @@ const ruid = crypto.randomUUID();
 const TerminalTabs = ({
   ref,
 }: {
-  ref: InferRefType<typeof TerminalComponent>;
+  ref: RefObject<{ resize: () => void } | null>;
 }) => {
   const [terminals, setTerminals] = useState<
     { id: string; ref: RefObject<{ resize: () => void } | null> }[]

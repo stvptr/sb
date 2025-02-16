@@ -5,7 +5,7 @@ const Preview = () => {
   const servers = useServers();
 
   return (
-    <div className="flex h-full w-full flex-col rounded-md border">
+    <div className="flex h-full w-full flex-col">
       <h1 className="border-b p-4 text-lg font-semibold">Preview</h1>
       {servers.length > 0 ? (
         <Tabs className="flex flex-1 flex-col">

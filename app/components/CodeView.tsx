@@ -11,6 +11,7 @@ import { Await } from "react-router";
 import { ClientOnly } from "~/components/ClientOnly";
 import Preview from "~/components/Preview";
 import FilesPanel from "~/components/FilesPanel";
+import { Settings } from "lucide-react";
 
 const CodeView = () => {
   const ref = useRef<{ resize: () => void } | null>(null);
@@ -46,11 +47,20 @@ const CodeView = () => {
   );
 };
 
+const fb = (
+  <div className="h-full">
+    <div className="flex h-full items-center justify-center gap-4">
+      <Settings className="h-8 w-8 animate-spin duration-[3s]" />
+      <span>Setting up your environment</span>
+    </div>
+  </div>
+);
+
 const CodeViewWc = () => {
   return (
     <ClientOnly>
       {() => (
-        <Suspense fallback={<div>loading web container</div>}>
+        <Suspense fallback={fb}>
           <Await resolve={getWebContainerP()}>
             {(wc) => (
               <WebContainerContext value={wc}>

@@ -8,6 +8,7 @@ import {
   ContextMenuTrigger,
 } from "~/components/ui/context-menu";
 import { useFs } from "~/web-container";
+import { cn } from "~/lib/utils";
 
 type FileNodeProps = {
   name: string;
@@ -25,9 +26,11 @@ const FileNode = ({
   path,
   node,
   onRename,
+  setCurrentFile,
   onDelete,
+  currentFile,
   onMove,
-}: FileNodeProps) => {
+}: FileNodeProps & FilesPanelProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleDragStart = (e: DragEvent, itemPath: string) => {
@@ -45,6 +48,7 @@ const FileNode = ({
   };
 
   const isDir = isDirectory(node);
+  const fullPath = path ? `${path}/${name}` : name;
 
   return (
     <div
@@ -67,8 +71,11 @@ const FileNode = ({
             </div>
           ) : (
             <div
-              className="flex cursor-pointer items-center space-x-2"
-              onClick={() => console.log("open file")}
+              className={cn(
+                "flex cursor-pointer items-center space-x-2",
+                fullPath === currentFile && "bg-gray-200",
+              )}
+              onClick={() => setCurrentFile(fullPath)}
             >
               <FileText size={16} className="text-blue-500" />
               <span>{name}</span>
@@ -94,7 +101,9 @@ const FileNode = ({
             <FileNode
               key={childName}
               name={childName}
-              path={`${path}/${childName}`}
+              path={fullPath}
+              setCurrentFile={setCurrentFile}
+              currentFile={currentFile}
               node={childNode}
               onRename={onRename}
               onDelete={onDelete}
@@ -107,7 +116,11 @@ const FileNode = ({
   );
 };
 
-const FileTree = ({ tree }: { tree: FileSystemTree }) => {
+const FileTree = ({
+  tree,
+  setCurrentFile,
+  currentFile,
+}: { tree: FileSystemTree } & FilesPanelProps) => {
   const handleRename = (path: string) => {
     console.log(`Rename ${path}`);
   };
@@ -135,6 +148,8 @@ const FileTree = ({ tree }: { tree: FileSystemTree }) => {
             key={name}
             name={name}
             path={""}
+            setCurrentFile={setCurrentFile}
+            currentFile={currentFile}
             node={node}
             onRename={handleRename}
             onDelete={handleDelete}
@@ -145,11 +160,22 @@ const FileTree = ({ tree }: { tree: FileSystemTree }) => {
   );
 };
 
-const FilesPanel = () => {
+type FilesPanelProps = {
+  currentFile: string | null;
+  setCurrentFile: (
+    value: ((prevState: string | null) => string | null) | string | null,
+  ) => void;
+};
+
+const FilesPanel = ({ currentFile, setCurrentFile }: FilesPanelProps) => {
   const fs = useFs();
   return (
     <div className="h-full">
-      <FileTree tree={fs} />
+      <FileTree
+        tree={fs}
+        currentFile={currentFile}
+        setCurrentFile={setCurrentFile}
+      />
     </div>
   );
 };

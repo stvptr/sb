@@ -1,8 +1,10 @@
-import MonacoEditor from "@monaco-editor/react";
+import MonacoEditor, { useMonaco } from "@monaco-editor/react";
 import { useFs, useWebContainer } from "~/web-container";
 import type { FileSystemTree } from "@webcontainer/api";
+import { useCallback, useEffect } from "react";
 
-const getFileContents = (fs: FileSystemTree, path: string) => {
+const getFileContents = (fs: FileSystemTree, path: string | null) => {
+  if (!path) return null;
   const fileSegments = path.split("/");
   const dir = fileSegments
     .slice(0, -1)
@@ -18,10 +20,36 @@ const getFileContents = (fs: FileSystemTree, path: string) => {
     : file.file.contents;
 };
 
-const CodeEditor = ({ currentFile }: { currentFile: string }) => {
+const CodeEditor = ({ currentFile }: { currentFile: string | null }) => {
   const fs = useFs();
   const wc = useWebContainer();
   const content = getFileContents(fs, currentFile);
+
+  const monaco = useMonaco();
+
+  useEffect(() => {
+    if (monaco) {
+      monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+        jsx: monaco.languages.typescript.JsxEmit.React, // Enable TSX
+        target: monaco.languages.typescript.ScriptTarget.ESNext,
+        allowNonTsExtensions: true,
+        moduleResolution:
+          monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+        module: monaco.languages.typescript.ModuleKind.ESNext,
+      });
+    }
+  }, [monaco]);
+  const getLang = useCallback(
+    (ext: string | undefined) => {
+      if (!ext) return "plaintext";
+      return (
+        monaco?.languages
+          .getLanguages()
+          .find((l) => l.extensions?.includes(ext))?.id || "plaintext"
+      );
+    },
+    [monaco],
+  );
 
   if (content === null) {
     return <div>No file open</div>;
@@ -31,10 +59,12 @@ const CodeEditor = ({ currentFile }: { currentFile: string }) => {
     <div className="h-full w-full rounded-md border border-gray-300">
       <MonacoEditor
         className="h-full"
-        defaultLanguage="javascript"
+        language={getLang(currentFile?.split(".").at(-1))}
         value={content}
         theme="vs-dark"
-        onChange={(value) => wc.fs.writeFile(currentFile, value || "")}
+        onChange={(value) =>
+          currentFile && wc.fs.writeFile(currentFile, value || "")
+        }
       />
     </div>
   );

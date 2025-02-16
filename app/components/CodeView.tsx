@@ -5,7 +5,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "~/components/ui/resizable";
-import { Suspense, useRef } from "react";
+import { Suspense, useRef, useState } from "react";
 import { getWebContainerP, WebContainerContext } from "~/web-container";
 import { Await } from "react-router";
 import { ClientOnly } from "~/components/ClientOnly";
@@ -15,17 +15,18 @@ import { Settings } from "lucide-react";
 
 const CodeView = () => {
   const ref = useRef<{ resize: () => void } | null>(null);
+  const [currentFile, setCurrentFile] = useState<string | null>(null);
   return (
     <ResizablePanelGroup direction="horizontal">
       <ResizablePanel defaultSize={20}>
-        <FilesPanel />
+        <FilesPanel currentFile={currentFile} setCurrentFile={setCurrentFile} />
       </ResizablePanel>
       <ResizableHandle />
       <ResizablePanel defaultSize={60}>
         <ResizablePanelGroup direction="vertical">
           <ResizablePanel defaultSize={80}>
             <div className="h-full w-full p-4">
-              <CodeEditor currentFile="script.js" />
+              <CodeEditor currentFile={currentFile} />
             </div>
           </ResizablePanel>
           <ResizableHandle />

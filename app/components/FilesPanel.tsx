@@ -1,5 +1,12 @@
 import type { FileSystemTree } from "@webcontainer/api";
-import { ChevronDown, ChevronRight, FileText, Folder } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Download,
+  FileText,
+  Folder,
+  Plus,
+} from "lucide-react";
 import { type DragEvent, useState } from "react";
 import {
   ContextMenu,
@@ -7,16 +14,24 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "~/components/ui/context-menu";
-import { useFs } from "~/web-container";
+import { useFs, useWebContainer } from "~/web-container";
 import { cn } from "~/lib/utils";
+import { Button } from "~/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 
 type FileNodeProps = {
   name: string;
   path: string;
   node: FileSystemTree[string];
-  onRename: (path: string) => void;
-  onDelete: (path: string) => void;
-  onMove: (from: string, to: string) => void;
+  onMove: (from: string, to: string | null) => void;
 };
 
 const isDirectory = (node: FileSystemTree[string]) => "directory" in node;
@@ -25,9 +40,7 @@ const FileNode = ({
   name,
   path,
   node,
-  onRename,
   setCurrentFile,
-  onDelete,
   currentFile,
   onMove,
 }: FileNodeProps & FilesPanelProps) => {
@@ -83,11 +96,18 @@ const FileNode = ({
           )}
         </ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem onSelect={() => onRename(path)}>
+          <ContextMenuItem
+            onSelect={() =>
+              onMove(
+                fullPath,
+                [...fullPath.split("/").slice(0, -1), "renamed.js"].join("/"),
+              )
+            }
+          >
             Rename
           </ContextMenuItem>
           <ContextMenuItem
-            onSelect={() => onDelete(path)}
+            onSelect={() => onMove(fullPath, null)}
             className="text-red-500"
           >
             Delete
@@ -105,8 +125,6 @@ const FileNode = ({
               setCurrentFile={setCurrentFile}
               currentFile={currentFile}
               node={childNode}
-              onRename={onRename}
-              onDelete={onDelete}
               onMove={onMove}
             />
           ))}
@@ -121,16 +139,14 @@ const FileTree = ({
   setCurrentFile,
   currentFile,
 }: { tree: FileSystemTree } & FilesPanelProps) => {
-  const handleRename = (path: string) => {
-    console.log(`Rename ${path}`);
-  };
+  const wc = useWebContainer();
 
-  const handleDelete = (path: string) => {
-    console.log(`Delete ${path}`);
-  };
-
-  const handleMove = (from: string, to: string) => {
-    console.log(`Move ${from} to ${to}`);
+  const handleMove = (from: string, to: string | null) => {
+    if (!to) {
+      wc.fs.rm(from);
+    } else {
+      wc.fs.rename(from, to);
+    }
   };
 
   return (
@@ -151,8 +167,6 @@ const FileTree = ({
             setCurrentFile={setCurrentFile}
             currentFile={currentFile}
             node={node}
-            onRename={handleRename}
-            onDelete={handleDelete}
             onMove={handleMove}
           />
         ))}
@@ -169,8 +183,58 @@ type FilesPanelProps = {
 
 const FilesPanel = ({ currentFile, setCurrentFile }: FilesPanelProps) => {
   const fs = useFs();
+  const wc = useWebContainer();
   return (
     <div className="h-full">
+      <div className="mb-4 flex justify-end gap-4 p-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() =>
+            wc
+              .export(wc.workdir, { format: "zip", excludes: ["node_modules"] })
+              .then((zip) => {
+                const blob = new Blob([zip], { type: "application/zip" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "export.zip";
+                a.click();
+                URL.revokeObjectURL(url);
+              })
+          }
+        >
+          <Download />
+        </Button>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <Plus />
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>New file</DialogTitle>
+              <form
+                className="mt-8 flex flex-col gap-2"
+                action={(form) => {
+                  const filename = form.get("filename");
+                  if (typeof filename === "string") {
+                    wc.fs.writeFile(filename, "");
+                  }
+                }}
+              >
+                <Input type="text" name="filename" required />
+                <DialogClose asChild>
+                  <Button type="submit" className="mt-4 w-fit">
+                    Create
+                  </Button>
+                </DialogClose>
+              </form>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
+      </div>
       <FileTree
         tree={fs}
         currentFile={currentFile}

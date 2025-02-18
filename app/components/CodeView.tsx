@@ -1,12 +1,16 @@
-import CodeEditor from "./CodeEditor";
+import CodeEditorClient from "./CodeEditor.client";
 import Terminal from "./Terminal.client";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "~/components/ui/resizable";
-import { Suspense, useRef, useState } from "react";
-import { getWebContainerP, WebContainerContext } from "~/web-container";
+import { Suspense, useEffect, useRef, useState } from "react";
+import {
+  getWebContainerP,
+  useWebContainer,
+  WebContainerContext,
+} from "~/web-container";
 import { Await } from "react-router";
 import { ClientOnly } from "~/components/ClientOnly";
 import Preview from "~/components/Preview";
@@ -16,6 +20,20 @@ import { Settings } from "lucide-react";
 const CodeView = () => {
   const ref = useRef<{ resize: () => void } | null>(null);
   const [currentFile, setCurrentFile] = useState<string | null>(null);
+
+  const wc = useWebContainer();
+
+  useEffect(() => {
+    if (!currentFile) return;
+
+    const watcher = wc.fs.watch(currentFile, (event) => {
+      if (event === "rename") {
+        setCurrentFile(null);
+      }
+    });
+    return () => watcher.close();
+  }, [currentFile]);
+
   return (
     <ResizablePanelGroup direction="horizontal">
       <ResizablePanel defaultSize={20}>
@@ -26,7 +44,7 @@ const CodeView = () => {
         <ResizablePanelGroup direction="vertical">
           <ResizablePanel defaultSize={80}>
             <div className="h-full w-full p-4">
-              <CodeEditor currentFile={currentFile} />
+              <CodeEditorClient currentFile={currentFile} />
             </div>
           </ResizablePanel>
           <ResizableHandle />

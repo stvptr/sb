@@ -6,7 +6,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig(({ command }) => ({
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
   ssr: {
-    noExternal: command === "build" ? true : undefined
+    noExternal: command === "build" ? true : ["monaco-editor"] as const
   }
   // server: {
   //   proxy: {},

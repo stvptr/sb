@@ -25,3 +25,7 @@ self.MonacoEnvironment = {
 };
 
 monaco.languages.typescript.typescriptDefaults.setEagerModelSync(true);
+// monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+//   target: monaco.languages.typescript.ScriptTarget.ESNext,
+//   allowNonTsExtensions: true
+// });

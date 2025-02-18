@@ -62,8 +62,9 @@ const CodeEditorClient = ({ currentFile }: { currentFile: string | null }) => {
   }, [editor, currentFile, content]);
 
   useEffect(() => {
-    const editor = monaco.editor.create(monacoEl.current!, {});
+    const editor = monaco.editor.create(monacoEl.current!,{});
     setEditor(editor);
+
     return () => editor?.dispose();
   }, []);
 

@@ -19,13 +19,17 @@ import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 
 type FileNodeProps = {
   name: string;
@@ -184,6 +188,9 @@ type FilesPanelProps = {
 const FilesPanel = ({ currentFile, setCurrentFile }: FilesPanelProps) => {
   const fs = useFs();
   const wc = useWebContainer();
+  const [isCreating, setIsCreating] = useState<false | "file" | "folder">(
+    false,
+  );
   return (
     <div className="h-full">
       <div className="mb-4 flex justify-end gap-4 p-1">
@@ -192,7 +199,7 @@ const FilesPanel = ({ currentFile, setCurrentFile }: FilesPanelProps) => {
           size="icon"
           onClick={() =>
             wc
-              .export('', { format: "zip", excludes: ["node_modules"] })
+              .export("", { format: "zip", excludes: ["node_modules"] })
               .then((zip) => {
                 const blob = new Blob([zip], { type: "application/zip" });
                 const url = URL.createObjectURL(blob);
@@ -206,30 +213,46 @@ const FilesPanel = ({ currentFile, setCurrentFile }: FilesPanelProps) => {
         >
           <Download />
         </Button>
-        <Dialog>
-          <DialogTrigger asChild>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon">
               <Plus />
             </Button>
-          </DialogTrigger>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => setIsCreating("file")}>
+              File
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsCreating("folder")}>
+              Folder
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Dialog
+          open={!!isCreating}
+          onOpenChange={(e) => {
+            if (e === false) setIsCreating(false);
+          }}
+        >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>New file</DialogTitle>
+              <DialogTitle className="capitalize">New {isCreating}</DialogTitle>
               <form
                 className="mt-8 flex flex-col gap-2"
-                action={(form) => {
+                action={async (form) => {
                   const filename = form.get("filename");
                   if (typeof filename === "string") {
-                    wc.fs.writeFile(filename, "");
+                    if (isCreating === "folder") await wc.fs.mkdir(filename);
+                    if (isCreating === "file")
+                      await wc.fs.writeFile(filename, "");
+                    setIsCreating(false);
                   }
                 }}
               >
                 <Input type="text" name="filename" required />
-                <DialogClose asChild>
-                  <Button type="submit" className="mt-4 w-fit">
-                    Create
-                  </Button>
-                </DialogClose>
+                <Button type="submit" className="mt-4 w-fit">
+                  Create
+                </Button>
               </form>
             </DialogHeader>
           </DialogContent>

@@ -5,15 +5,61 @@ let fs: FileSystemTree = {};
 
 const setupWebContainer = async () => {
   const wc = await WebContainer.boot();
+  // @ts-ignore
+  window.wc = wc;
+
   await wc.mount(fs);
-  let exportTimeout: ReturnType<typeof setTimeout> | null = null;
   wc.fs.watch("/", { recursive: true }, async (e, f) => {
-    // need to debounce this or not export every time but just make the specific change
-    if (exportTimeout) clearTimeout(exportTimeout);
-    exportTimeout = setTimeout(async () => {
-      fs = await wc.export(wc.workdir, {});
-      emitChange();
-    }, 100);
+    console.log(e, f);
+    const filePath = typeof f === "string" ? f : new TextDecoder().decode(f);
+    const folderPath = filePath.split("/").slice(0, -1).join("/");
+    const folderContent = await wc.fs.readdir(folderPath, {
+      withFileTypes: true,
+    });
+    const entry = folderContent.find(
+      (f) => f.name === filePath.split("/").at(-1),
+    );
+    if (e === "rename") {
+      if (!entry) {
+        fs = { ...fs };
+        const tree = filePath
+          .split("/")
+          .slice(0, -1)
+          .reduce((acc, segment) => {
+            const s = acc[segment];
+            if (s && "directory" in s) return s.directory;
+            else throw new Error("could not locate tree to delete");
+          }, fs);
+        delete tree[filePath.split("/").at(-1)!];
+      } else {
+        fs = { ...fs };
+        const tree = filePath
+          .split("/")
+          .slice(0, -1)
+          .reduce((acc, segment) => {
+            const s = acc[segment];
+            if (s && "directory" in s) return s.directory;
+            else throw new Error("could not locate tree to delete");
+          }, fs);
+        tree[filePath.split("/").at(-1)!] = entry.isDirectory()
+          ? { directory: await wc.export(filePath) }
+          : { file: { contents: await wc.fs.readFile(filePath) } };
+      }
+    }
+    if (e === "change" && entry?.isFile()) {
+      fs = { ...fs };
+      const content = await wc.fs.readFile(filePath);
+      const tree = filePath
+        .split("/")
+        .slice(0, -1)
+        .reduce((acc, segment) => {
+          const s = acc[segment];
+          if (s && "directory" in s) return s.directory;
+          else throw new Error("could not locate tree to delete");
+        }, fs);
+      tree[filePath.split("/").at(-1)!] = { file: { contents: content } };
+    }
+    emitFsChanges();
   });
   wc.on("server-ready", (port, url) => {
     servers = [...new Set([...servers, url])];
@@ -50,10 +96,17 @@ export const useWebContainer = () => {
 
 const getFs = () => fs;
 let fsListeners: (() => void)[] = [];
-const emitChange = () => {
-  for (let listener of fsListeners) {
-    listener();
-  }
+
+let to: NodeJS.Timeout | undefined;
+const emitFsChanges = () => {
+  // debounce with timeout
+  if (to) clearTimeout(to);
+  to = setTimeout(() => {
+    for (let listener of fsListeners) {
+      listener();
+    }
+    console.log(fs);
+  }, 100);
 };
 const subFs = (listener: () => void) => {
   fsListeners.push(listener);

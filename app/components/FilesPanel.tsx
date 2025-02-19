@@ -143,7 +143,7 @@ const FileTree = ({
 
   const handleMove = (from: string, to: string | null) => {
     if (!to) {
-      wc.fs.rm(from);
+      wc.fs.rm(from, { recursive: true });
     } else {
       wc.fs.rename(from, to);
     }
@@ -192,7 +192,7 @@ const FilesPanel = ({ currentFile, setCurrentFile }: FilesPanelProps) => {
           size="icon"
           onClick={() =>
             wc
-              .export(wc.workdir, { format: "zip", excludes: ["node_modules"] })
+              .export('', { format: "zip", excludes: ["node_modules"] })
               .then((zip) => {
                 const blob = new Blob([zip], { type: "application/zip" });
                 const url = URL.createObjectURL(blob);

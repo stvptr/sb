@@ -5,34 +5,47 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "~/components/ui/resizable";
-import { Suspense, useEffect, useRef, useState } from "react";
-import {
-  getWebContainerP,
-  useWebContainer,
-  WebContainerContext,
-} from "~/web-container";
+import { Suspense, useRef, useState } from "react";
+import { getWebContainerP, useFs, WebContainerContext } from "~/web-container";
 import { Await } from "react-router";
 import { ClientOnly } from "~/components/ClientOnly";
 import Preview from "~/components/Preview";
 import FilesPanel from "~/components/FilesPanel";
 import { Settings } from "lucide-react";
+import type { FileSystemTree } from "@webcontainer/api";
+
+const getFileContents = (fs: FileSystemTree, path: string | null) => {
+  if (!path) return null;
+  const fileSegments = path.split("/");
+  const dir = fileSegments
+    .slice(0, -1)
+    .reduce((acc: FileSystemTree | null, segment) => {
+      const s = acc?.[segment];
+      if (!s) return null;
+      return "directory" in s ? s.directory : acc;
+    }, fs);
+  if (!dir) return null;
+  const fileName = fileSegments.at(-1);
+  if (!fileName) return null;
+  const file = dir[fileName];
+  if (!file || !("file" in file) || !("contents" in file.file)) return null;
+  return file.file.contents instanceof Uint8Array
+    ? new TextDecoder().decode(file.file.contents)
+    : file.file.contents;
+};
 
 const CodeView = () => {
   const ref = useRef<{ resize: () => void } | null>(null);
   const [currentFile, setCurrentFile] = useState<string | null>(null);
 
-  const wc = useWebContainer();
+  const fs = useFs();
+  const fileContent = getFileContents(fs, currentFile);
+  if (currentFile && fileContent == null) setCurrentFile(fileContent);
 
-  useEffect(() => {
-    if (!currentFile) return;
-
-    const watcher = wc.fs.watch(currentFile, (event) => {
-      if (event === "rename") {
-        setCurrentFile(null);
-      }
-    });
-    return () => watcher.close();
-  }, [currentFile]);
+  const file =
+    currentFile && fileContent !== null
+      ? { path: currentFile, content: fileContent }
+      : null;
 
   return (
     <ResizablePanelGroup direction="horizontal">
@@ -44,7 +57,7 @@ const CodeView = () => {
         <ResizablePanelGroup direction="vertical">
           <ResizablePanel defaultSize={80}>
             <div className="h-full w-full p-4">
-              <CodeEditorClient currentFile={currentFile} />
+              <CodeEditorClient file={file} />
             </div>
           </ResizablePanel>
           <ResizableHandle />

@@ -1,24 +1,6 @@
-import { useFs, useWebContainer } from "~/web-container";
-import type { FileSystemTree } from "@webcontainer/api";
+import { useWebContainer } from "~/web-container";
 import { useEffect, useRef, useState } from "react";
 import * as monaco from "monaco-editor";
-
-const getFileContents = (fs: FileSystemTree, path: string | null) => {
-  if (!path) return null;
-  const fileSegments = path.split("/");
-  const dir = fileSegments
-    .slice(0, -1)
-    .reduce((acc: FileSystemTree, segment) => {
-      return "directory" in acc[segment] ? acc[segment].directory : acc;
-    }, fs);
-  const fileName = fileSegments.at(-1);
-  if (!fileName) return null;
-  const file = dir[fileName];
-  if (!file || !("file" in file) || !("contents" in file.file)) return null;
-  return file.file.contents instanceof Uint8Array
-    ? new TextDecoder().decode(file.file.contents)
-    : file.file.contents;
-};
 
 // const getLang = (ext: string | undefined) => {
 //   if (!ext) return "plaintext";
@@ -29,10 +11,12 @@ const getFileContents = (fs: FileSystemTree, path: string | null) => {
 //   );
 // };
 
-const CodeEditorClient = ({ currentFile }: { currentFile: string | null }) => {
-  const fs = useFs();
+const CodeEditorClient = ({
+  file,
+}: {
+  file: { path: string; content: string } | null;
+}) => {
   const wc = useWebContainer();
-  const content = getFileContents(fs, currentFile);
   const [editor, setEditor] =
     useState<monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoEl = useRef<null | HTMLDivElement>(null);
@@ -45,24 +29,24 @@ const CodeEditorClient = ({ currentFile }: { currentFile: string | null }) => {
   useEffect(() => {
     let disposable: monaco.IDisposable | null = null;
 
-    const uri = currentFile && monaco.Uri.file(currentFile);
+    const uri = file && monaco.Uri.file(file.path);
     const model = uri
       ? monaco.editor.getModel(uri) ||
-        monaco.editor.createModel(content || "", undefined, uri)
+        monaco.editor.createModel(file?.content || "", undefined, uri)
       : null;
-    if (model && currentFile) {
-      if (model.getValue() !== content) model.setValue(content || "");
+    if (model && file) {
+      if (model.getValue() !== file.content) model.setValue(file.content || "");
       disposable = model.onDidChangeContent(async (e) => {
-        await wc.fs.writeFile(currentFile, model.getValue());
+        await wc.fs.writeFile(file.path, model.getValue());
       });
     }
     if (editor?.getModel() != model) editor?.setModel(model);
 
     return () => disposable?.dispose();
-  }, [editor, currentFile, content]);
+  }, [editor, file?.content, file?.path]);
 
   useEffect(() => {
-    const editor = monaco.editor.create(monacoEl.current!,{});
+    const editor = monaco.editor.create(monacoEl.current!, {});
     setEditor(editor);
 
     return () => editor?.dispose();

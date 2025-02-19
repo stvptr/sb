@@ -40,6 +40,7 @@ type FileNodeProps = {
 
 const isDirectory = (node: FileSystemTree[string]) => "directory" in node;
 
+let dragging: string | null = null;
 const FileNode = ({
   name,
   path,
@@ -49,31 +50,44 @@ const FileNode = ({
   onMove,
 }: FileNodeProps & FilesPanelProps) => {
   const [isOpen, setIsOpen] = useState(false);
-
-  const handleDragStart = (e: DragEvent, itemPath: string) => {
-    // e.dataTransfer.setData("text/plain", itemPath);
-    console.log("drag start", e, itemPath);
-  };
-
-  const handleDrop = (e: DragEvent, targetPath: string) => {
-    console.log("drop", e, targetPath);
-    // e.preventDefault();
-    // const sourcePath = e.dataTransfer.getData("text/plain");
-    // if (sourcePath && sourcePath !== targetPath) {
-    //   onMove(sourcePath, targetPath);
-    // }
-  };
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const isDir = isDirectory(node);
   const fullPath = path ? `${path}/${name}` : name;
+
+  const handleDragStart = (e: DragEvent) => {
+    console.log("drag start", fullPath);
+    dragging = fullPath;
+    e.stopPropagation();
+  };
+
+  const handleDragOver = (e: DragEvent) => {
+    console.log("drag over");
+    e.preventDefault();
+  };
+
+  const handleDragEnd = (e: DragEvent) => {
+    console.log("drag end");
+    dragging = null;
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    const droppedName = dragging!.split("/").at(-1);
+    const dir = isDir ? fullPath : path;
+    onMove(dragging!, `${dir}/${droppedName}`);
+    console.log("drop", dragging!, `${dir}/${droppedName}`);
+    e.stopPropagation();
+  };
 
   return (
     <div
       className="pl-4"
       draggable
-      // onDragStart={(e) => handleDragStart(e, path)}
-      // onDragOver={(e) => e.preventDefault()}
-      // onDrop={(e) => handleDrop(e, isDir ? `${path}/${name}` : path)}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onDragEnd={handleDragEnd}
     >
       <ContextMenu>
         <ContextMenuTrigger asChild>
@@ -100,14 +114,7 @@ const FileNode = ({
           )}
         </ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem
-            onSelect={() =>
-              onMove(
-                fullPath,
-                [...fullPath.split("/").slice(0, -1), "renamed.js"].join("/"),
-              )
-            }
-          >
+          <ContextMenuItem onSelect={() => setIsDialogOpen(true)}>
             Rename
           </ContextMenuItem>
           <ContextMenuItem
@@ -118,6 +125,32 @@ const FileNode = ({
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="capitalize">Rename</DialogTitle>
+            <form
+              className="mt-8 flex flex-col gap-2"
+              action={async (form) => {
+                const filename = form.get("filename");
+                if (typeof filename === "string") {
+                  onMove(
+                    fullPath,
+                    [...fullPath.split("/").slice(0, -1), filename].join("/"),
+                  );
+                  setIsDialogOpen(false);
+                }
+              }}
+            >
+              <Input type="text" name="filename" required />
+              <Button type="submit" className="mt-4 w-fit">
+                Rename
+              </Button>
+            </form>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
 
       {isOpen && isDir && (
         <div className="pl-4">
@@ -242,13 +275,16 @@ const FilesPanel = ({ currentFile, setCurrentFile }: FilesPanelProps) => {
                 action={async (form) => {
                   const filename = form.get("filename");
                   if (typeof filename === "string") {
-                    if(isCreating === "folder") {
+                    if (isCreating === "folder") {
                       await wc.fs.mkdir(filename, { recursive: true });
                     }
                     if (isCreating === "file") {
-                      await wc.fs.mkdir(filename.split("/").slice(0, -1).join("/"), {
-                        recursive: true,
-                      });
+                      await wc.fs.mkdir(
+                        filename.split("/").slice(0, -1).join("/"),
+                        {
+                          recursive: true,
+                        },
+                      );
                       await wc.fs.writeFile(filename, "");
                     }
                     setIsCreating(false);

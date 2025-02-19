@@ -242,9 +242,15 @@ const FilesPanel = ({ currentFile, setCurrentFile }: FilesPanelProps) => {
                 action={async (form) => {
                   const filename = form.get("filename");
                   if (typeof filename === "string") {
-                    if (isCreating === "folder") await wc.fs.mkdir(filename);
-                    if (isCreating === "file")
+                    if(isCreating === "folder") {
+                      await wc.fs.mkdir(filename, { recursive: true });
+                    }
+                    if (isCreating === "file") {
+                      await wc.fs.mkdir(filename.split("/").slice(0, -1).join("/"), {
+                        recursive: true,
+                      });
                       await wc.fs.writeFile(filename, "");
+                    }
                     setIsCreating(false);
                   }
                 }}

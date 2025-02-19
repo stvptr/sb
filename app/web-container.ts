@@ -1,5 +1,6 @@
 import { type FileSystemTree, WebContainer } from "@webcontainer/api";
 import { createContext, useContext, useSyncExternalStore } from "react";
+import { createQueue } from "~/lib/promise-queue";
 
 let fs: FileSystemTree = {};
 
@@ -9,57 +10,60 @@ const setupWebContainer = async () => {
   window.wc = wc;
 
   await wc.mount(fs);
+  const fsUpdatesQueue = createQueue();
   wc.fs.watch("/", { recursive: true }, async (e, f) => {
     console.log(e, f);
-    const filePath = typeof f === "string" ? f : new TextDecoder().decode(f);
-    const folderPath = filePath.split("/").slice(0, -1).join("/");
-    const folderContent = await wc.fs.readdir(folderPath, {
-      withFileTypes: true,
-    });
-    const entry = folderContent.find(
-      (f) => f.name === filePath.split("/").at(-1),
-    );
-    if (e === "rename") {
-      if (!entry) {
-        fs = { ...fs };
-        const tree = filePath
-          .split("/")
-          .slice(0, -1)
-          .reduce((acc, segment) => {
-            const s = acc[segment];
-            if (s && "directory" in s) return s.directory;
-            else throw new Error("could not locate tree to delete");
-          }, fs);
-        delete tree[filePath.split("/").at(-1)!];
-      } else {
-        fs = { ...fs };
-        const tree = filePath
-          .split("/")
-          .slice(0, -1)
-          .reduce((acc, segment) => {
-            const s = acc[segment];
-            if (s && "directory" in s) return s.directory;
-            else throw new Error("could not locate tree to delete");
-          }, fs);
-        tree[filePath.split("/").at(-1)!] = entry.isDirectory()
-          ? { directory: await wc.export(filePath) }
-          : { file: { contents: await wc.fs.readFile(filePath) } };
+    fsUpdatesQueue.add(async () => {
+      const filePath = typeof f === "string" ? f : new TextDecoder().decode(f);
+      const folderPath = filePath.split("/").slice(0, -1).join("/");
+      const folderContent = await wc.fs.readdir(folderPath, {
+        withFileTypes: true,
+      });
+      const entry = folderContent.find(
+        (f) => f.name === filePath.split("/").at(-1),
+      );
+      if (e === "rename") {
+        if (!entry) {
+          fs = { ...fs };
+          const tree = filePath
+            .split("/")
+            .slice(0, -1)
+            .reduce((acc, segment) => {
+              const s = acc[segment];
+              if (s && "directory" in s) return s.directory;
+              else throw new Error("could not locate tree to delete");
+            }, fs);
+          delete tree[filePath.split("/").at(-1)!];
+        } else {
+          fs = { ...fs };
+          const tree = filePath
+            .split("/")
+            .slice(0, -1)
+            .reduce((acc, segment) => {
+              const s = acc[segment];
+              if (s && "directory" in s) return s.directory;
+              else throw new Error("could not locate tree to insert");
+            }, fs);
+          tree[filePath.split("/").at(-1)!] = entry.isDirectory()
+            ? { directory: await wc.export(filePath) }
+            : { file: { contents: await wc.fs.readFile(filePath) } };
+        }
       }
-    }
-    if (e === "change" && entry?.isFile()) {
-      fs = { ...fs };
-      const content = await wc.fs.readFile(filePath);
-      const tree = filePath
-        .split("/")
-        .slice(0, -1)
-        .reduce((acc, segment) => {
-          const s = acc[segment];
-          if (s && "directory" in s) return s.directory;
-          else throw new Error("could not locate tree to delete");
-        }, fs);
-      tree[filePath.split("/").at(-1)!] = { file: { contents: content } };
-    }
-    emitFsChanges();
+      if (e === "change" && entry?.isFile()) {
+        fs = { ...fs };
+        const content = await wc.fs.readFile(filePath);
+        const tree = filePath
+          .split("/")
+          .slice(0, -1)
+          .reduce((acc, segment) => {
+            const s = acc[segment];
+            if (s && "directory" in s) return s.directory;
+            else throw new Error("could not locate tree to insert");
+          }, fs);
+        tree[filePath.split("/").at(-1)!] = { file: { contents: content } };
+      }
+      emitFsChanges();
+    });
   });
   wc.on("server-ready", (port, url) => {
     servers = [...new Set([...servers, url])];

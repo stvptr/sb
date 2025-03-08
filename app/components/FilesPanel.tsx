@@ -240,7 +240,7 @@ const FilesPanel = ({ currentFile, setCurrentFile }: FilesPanelProps) => {
           size="icon"
           onClick={() =>
             wc
-              .export("", { format: "zip", excludes: [] })
+              .export("", { format: "zip", excludes: ["**/node_modules"] })
               .then((zip) => {
                 const blob = new Blob([zip], { type: "application/zip" });
                 const url = URL.createObjectURL(blob);

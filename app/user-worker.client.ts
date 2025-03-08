@@ -43,4 +43,5 @@ monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
   jsxFragmentFactory: "React.Fragment",
   experimentalDecorators: true,
   allowSyntheticDefaultImports: true,
+  allowImportingTsExtensions: true,
 });

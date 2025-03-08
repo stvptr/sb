@@ -25,10 +25,16 @@ export const createPreviewServers = () => {
     emitChangeServers();
   };
 
+  const clear = () => {
+    servers = [];
+    emitChangeServers();
+  };
+
   return {
     subServers,
     getServers: () => servers,
     add,
     rm,
+    clear,
   };
 };

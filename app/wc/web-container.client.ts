@@ -6,8 +6,11 @@ import { parsePath } from "~/lib/fs-utils";
 import { createFs } from "~/wc/fs-tree";
 import { createPreviewServers } from "~/wc/preview-servers";
 import { createQueue } from "~/lib/promise-queue";
-
-const disposables: { [key in string]?: IDisposable } = {};
+import {
+  addExtraLib,
+  addOrReplaceExtraLib, clearExtraLibs,
+  removeExtraLib
+} from "~/wc/external-libs.client";
 
 const setupWebContainer = async () => {
   const wc = await WebContainer.boot();
@@ -18,7 +21,6 @@ const setupWebContainer = async () => {
     "",
     { recursive: true, encoding: "utf-8" },
     async (event, filename) => {
-      console.log("fs event", event, filename);
 
       const task = async () => {
         filename =
@@ -26,15 +28,11 @@ const setupWebContainer = async () => {
             ? filename
             : new TextDecoder().decode(filename);
 
-        if (filename.split("/").includes("node_modules")) {
+        if (filename.split("/").includes("node_modules") ) {
+          if(!filename.endsWith(".d.ts")) return
           if (event === "change") {
-            disposables[filename]!.dispose();
             const fileContent = await wc.fs.readFile(filename, "utf-8");
-            disposables[filename] =
-              monaco.languages.typescript.typescriptDefaults.addExtraLib(
-                fileContent,
-                monaco.Uri.file(filename).toString(true),
-              );
+            addOrReplaceExtraLib(fileContent, filename);
           } else if (event === "rename") {
             const { parentDir, fileOrFolderName } = parsePath(filename);
             const dir = await wc.fs.readdir(parentDir || "", {
@@ -44,23 +42,12 @@ const setupWebContainer = async () => {
             const fileOrFolder = dir.find((d) => d.name === fileOrFolderName);
             if (!fileOrFolder) {
               // DELETED FILE OR FOLDER
-              if (filename in disposables) {
-                Object.entries(disposables).forEach(([key, value]) => {
-                  if (key.startsWith(`${filename}/`) || key === filename) {
-                    value!.dispose();
-                    delete disposables[key];
-                  }
-                });
-              }
+              removeExtraLib(filename);
             } else {
               // NEW FILE
               if (fileOrFolder.isFile() && filename.endsWith(".d.ts")) {
                 const fileContent = await wc.fs.readFile(filename, "utf-8");
-                disposables[filename] =
-                  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-                    fileContent,
-                    monaco.Uri.file(filename).toString(true),
-                  );
+                addExtraLib(fileContent, filename);
               } else if (fileOrFolder.isDirectory()) {
                 // NEW DIRECTORY
               }
@@ -142,18 +129,42 @@ const setupWebContainer = async () => {
 
 export const getWebContainerP = (() => {
   let webContainerP: Promise<WebContainer> | null = null;
-  return async (fs?: FileSystemTree) => {
+
+  const get = async () => {
     if (webContainerP) return webContainerP;
     webContainerP = setupWebContainer();
     const wc = await webContainerP;
-    if (fs) await wc.mount(fs);
     const teardown = wc.teardown;
     wc.teardown = () => {
       teardown.call(wc);
       webContainerP = null;
+      servers.clear();
+      fs.clear();
+      monaco.editor.getModels().forEach((model) => model.dispose());
+      clearExtraLibs()
     };
     return wc;
   };
+
+  const dispose = async () => {
+    if (webContainerP) {
+      const wc = await webContainerP;
+      wc.teardown();
+    }
+  };
+
+  const create = async (fs?: FileSystemTree) => {
+    await dispose();
+    const wc = await get();
+    if (fs) await wc.mount(fs);
+    return wc;
+  };
+
+  return () => ({
+    get,
+    dispose,
+    create,
+  });
 })();
 
 export const WebContainerContext = createContext<WebContainer | null>(null);

@@ -62,9 +62,15 @@ export const createFs = () => {
     emitFsChanges();
   };
 
+  const clear = () => {
+    fs = {};
+    emitFsChanges();
+  };
+
   return {
     add,
     rm,
+    clear,
     getTree: () => fs,
     subFs,
   };

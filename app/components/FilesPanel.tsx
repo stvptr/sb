@@ -60,18 +60,15 @@ const FileNode = ({
   // if (isDir && name === "node_modules") return null;
 
   const handleDragStart = (e: DragEvent) => {
-    console.log("drag start", fullPath);
     dragging = fullPath;
     e.stopPropagation();
   };
 
   const handleDragOver = (e: DragEvent) => {
-    console.log("drag over");
     e.preventDefault();
   };
 
   const handleDragEnd = (e: DragEvent) => {
-    console.log("drag end");
     dragging = null;
     e.stopPropagation();
   };
@@ -80,7 +77,6 @@ const FileNode = ({
     const { fileOrFolderName: droppedName } = parsePath(dragging!);
     const dir = isDir ? fullPath : path;
     onMove(dragging!, `${dir}/${droppedName}`);
-    console.log("drop", dragging!, `${dir}/${droppedName}`);
     e.stopPropagation();
   };
 
@@ -244,7 +240,7 @@ const FilesPanel = ({ currentFile, setCurrentFile }: FilesPanelProps) => {
           size="icon"
           onClick={() =>
             wc
-              .export("", { format: "zip", excludes: ["node_modules"] })
+              .export("", { format: "zip", excludes: [] })
               .then((zip) => {
                 const blob = new Blob([zip], { type: "application/zip" });
                 const url = URL.createObjectURL(blob);

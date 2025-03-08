@@ -44,7 +44,6 @@ const TerminalComponent = ({ ref }: { ref: Ref<Resizable | null> }) => {
       terminal.loadAddon(fitAddon);
       terminal.open(refTerm.current!);
       fitAddon.fit();
-      window.addEventListener("resize", () => fitAddon.fit());
     };
 
     requestAnimationFrame(() => {
@@ -59,7 +58,6 @@ const TerminalComponent = ({ ref }: { ref: Ref<Resizable | null> }) => {
       abort = true;
       terminal.dispose();
       fitAddon.dispose();
-      window.removeEventListener("resize", () => fitAddon.fit());
     };
   }, []);
 

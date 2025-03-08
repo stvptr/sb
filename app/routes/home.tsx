@@ -1,15 +1,14 @@
 import type { Route } from "./+types/home";
-import CodeView from "~/components/CodeView";
+import Home from "~/components/Home";
 
 export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" }
-  ];
+  return [{ title: "Code editor" }];
 }
 
-export default function Home() {
-  return <main className="h-screen">
-    <CodeView />
-  </main>;
+export default function HomePage() {
+  return (
+    <main className="h-screen">
+      <Home />
+    </main>
+  );
 }

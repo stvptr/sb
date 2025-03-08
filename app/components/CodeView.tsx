@@ -29,9 +29,9 @@ const CodeView = () => {
   }, []);
 
   useEffect(() => {
-    document.addEventListener("resize", onResize);
-    return () => document.removeEventListener("resize", onResize);
-  });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  },[onResize]);
 
   return (
     <ResizablePanelGroup direction="horizontal">
@@ -79,7 +79,7 @@ const CodeViewWc = () => {
     <ClientOnly>
       {() => (
         <Suspense fallback={fb}>
-          <Await resolve={getWebContainerP()}>
+          <Await resolve={getWebContainerP().get()}>
             {(wc) => (
               <WebContainerContext value={wc}>
                 <CodeView />

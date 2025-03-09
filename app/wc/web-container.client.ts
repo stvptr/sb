@@ -1,119 +1,140 @@
-import { type FileSystemTree, WebContainer } from "@webcontainer/api";
+import {
+  type FileSystemTree,
+  type FSWatchCallback,
+  WebContainer,
+} from "@webcontainer/api";
 import { createContext, useContext, useSyncExternalStore } from "react";
-import type { IDisposable } from "monaco-editor";
-import * as monaco from "monaco-editor";
 import { parsePath } from "~/lib/fs-utils";
 import { createFs } from "~/wc/fs-tree";
 import { createPreviewServers } from "~/wc/preview-servers";
 import { createQueue } from "~/lib/promise-queue";
 import {
   addExtraLib,
-  addOrReplaceExtraLib, clearExtraLibs,
-  removeExtraLib
+  clearExtraLibs,
+  removeExtraLib,
 } from "~/wc/external-libs.client";
+import {
+  clearModels,
+  createModel,
+  removeModels,
+  updateModel,
+} from "~/wc/models.client";
+import { printDev } from "~/lib/dev";
 
 const setupWebContainer = async () => {
   const wc = await WebContainer.boot();
 
   const queue = createQueue();
 
+  const handleFileEvent: FSWatchCallback = async (event, filename) => {
+    filename =
+      typeof filename === "string"
+        ? filename
+        : new TextDecoder().decode(filename);
+
+    const handle = async ({
+      onFileChanged,
+      onNewOrRenamedFile,
+      onNewOrRenamedDirectory,
+      onFileOrDirectoryRemoved,
+    }: {
+      onFileChanged: () => Promise<void>;
+      onFileOrDirectoryRemoved: () => Promise<void>;
+      onNewOrRenamedFile: () => Promise<void>;
+      onNewOrRenamedDirectory: () => Promise<void>;
+    }) => {
+      if (event === "change") {
+        await onFileChanged();
+      }
+      if (event === "rename") {
+        const { parentDir, fileOrFolderName } = parsePath(filename);
+        const dir = await wc.fs.readdir(parentDir || "", {
+          withFileTypes: true,
+        });
+        // if this readdir throws an error, it means the parent directory was deleted, so another callback will handle deletion
+        const fileOrFolder = dir.find((d) => d.name === fileOrFolderName);
+        if (!fileOrFolder) {
+          await onFileOrDirectoryRemoved();
+        } else {
+          if (fileOrFolder.isFile()) {
+            await onNewOrRenamedFile();
+          } else if (fileOrFolder.isDirectory()) {
+            await onNewOrRenamedDirectory();
+          }
+        }
+      }
+    };
+
+    const isNodeModules = filename.split("/").includes("node_modules");
+
+    // TODO improve this part
+    /**
+     * We assume here that files in node_modules never change, folders are never renamed
+     *
+     * Also files sync could be further optimized ...
+     */
+    if (isNodeModules) {
+      if (filename.endsWith(".d.ts")) {
+        await handle({
+          onNewOrRenamedFile: async () => {
+            const fileContent = await wc.fs.readFile(filename, "utf-8");
+            addExtraLib(fileContent, filename);
+          },
+          onFileOrDirectoryRemoved: async () => {
+            removeExtraLib(filename);
+          },
+          onFileChanged: async () => {},
+          onNewOrRenamedDirectory: async () => {},
+        });
+      }
+    } else {
+      await handle({
+        onFileChanged: async () => {
+          const fileContent = await wc.fs.readFile(filename, "utf-8");
+          updateModel(filename, fileContent);
+        },
+        onNewOrRenamedFile: async () => {
+          if (!fs.exists(filename)) {
+            createModel(filename, await wc.fs.readFile(filename, "utf-8"));
+            fs.add(filename);
+          }
+        },
+        onNewOrRenamedDirectory: async () => {
+          if (!fs.exists(filename)) {
+            fs.add(filename, {});
+            const sync = async (base: string) => {
+              const children = await wc.fs.readdir(base, {
+                withFileTypes: true,
+              });
+              for (let child of children) {
+                const path = base + "/" + child.name;
+                if (child.isDirectory()) {
+                  fs.add(path, {});
+                  await sync(path);
+                } else {
+                  createModel(path, await wc.fs.readFile(path, "utf-8"));
+                  fs.add(path);
+                }
+              }
+            };
+            await sync(filename);
+          }
+        },
+        onFileOrDirectoryRemoved: async () => {
+          removeModels(filename);
+          fs.rm(filename);
+        },
+      });
+    }
+    printDev("task done");
+  };
+
   wc.fs.watch(
     "",
     { recursive: true, encoding: "utf-8" },
     async (event, filename) => {
-
-      const task = async () => {
-        filename =
-          typeof filename === "string"
-            ? filename
-            : new TextDecoder().decode(filename);
-
-        if (filename.split("/").includes("node_modules") ) {
-          if(!filename.endsWith(".d.ts")) return
-          if (event === "change") {
-            const fileContent = await wc.fs.readFile(filename, "utf-8");
-            addOrReplaceExtraLib(fileContent, filename);
-          } else if (event === "rename") {
-            const { parentDir, fileOrFolderName } = parsePath(filename);
-            const dir = await wc.fs.readdir(parentDir || "", {
-              withFileTypes: true,
-            });
-            // if this readdir throws an error, it means the parent directory was deleted, so another callback will handle deletion
-            const fileOrFolder = dir.find((d) => d.name === fileOrFolderName);
-            if (!fileOrFolder) {
-              // DELETED FILE OR FOLDER
-              removeExtraLib(filename);
-            } else {
-              // NEW FILE
-              if (fileOrFolder.isFile() && filename.endsWith(".d.ts")) {
-                const fileContent = await wc.fs.readFile(filename, "utf-8");
-                addExtraLib(fileContent, filename);
-              } else if (fileOrFolder.isDirectory()) {
-                // NEW DIRECTORY
-              }
-            }
-          }
-        } else {
-          if (event === "change") {
-            const fileContent = await wc.fs.readFile(filename, "utf-8");
-
-            const model = monaco.editor.getModel(monaco.Uri.file(filename))!;
-            if (model.getValue() !== fileContent) {
-              model.setValue(fileContent);
-            }
-          } else if (event === "rename") {
-            const { parentDir, fileOrFolderName } = parsePath(filename);
-            const dir = await wc.fs.readdir(parentDir || "", {
-              withFileTypes: true,
-            });
-            // if this readdir throws an error, it means the parent directory was deleted, so another callback will handle deletion
-            const fileOrFolder = dir.find((d) => d.name === fileOrFolderName);
-            if (!fileOrFolder) {
-              // DELETED FILE OR FOLDER
-              monaco.editor
-                .getModels()
-                .filter((model) => {
-                  return (
-                    model.uri.path === `/${filename}` ||
-                    model.uri.path.startsWith(`/${filename}/`)
-                  );
-                })
-                .forEach((model) => model.dispose());
-              fs.rm(filename);
-            } else {
-              // NEW FILE
-              if (fileOrFolder.isFile()) {
-                const fileContent = await wc.fs.readFile(filename, "utf-8");
-                monaco.editor.createModel(
-                  fileContent,
-                  undefined,
-                  monaco.Uri.file(filename),
-                );
-                fs.add(filename);
-              } else if (fileOrFolder.isDirectory()) {
-                // NEW DIRECTORY
-
-                fs.add(filename, {});
-                const sync = async (base: string) => {
-                  const children = await wc.fs.readdir(base, {
-                    withFileTypes: true,
-                  });
-                  for (let child of children) {
-                    if (child.isDirectory()) {
-                      fs.add(base + "/" + child.name, {});
-                      await sync(base + "/" + child.name);
-                    } else {
-                      fs.add(base + "/" + child.name);
-                    }
-                  }
-                };
-                await sync(filename);
-              }
-            }
-          }
-        }
-      };
-      queue.add(task);
+      printDev(event, filename);
+      queue.add(async () => handleFileEvent(event, filename));
     },
   );
 
@@ -140,8 +161,8 @@ export const getWebContainerP = (() => {
       webContainerP = null;
       servers.clear();
       fs.clear();
-      monaco.editor.getModels().forEach((model) => model.dispose());
-      clearExtraLibs()
+      clearModels();
+      clearExtraLibs();
     };
     return wc;
   };

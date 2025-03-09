@@ -1,13 +1,15 @@
 import * as monaco from "monaco-editor";
+import { printDev } from "~/lib/dev";
 
 let extraLibs: { content: string; filePath: string }[] = [];
 
 const setExtraLibs = (() => {
   let to: NodeJS.Timeout | null = null;
-  return (libs: { content: string; filePath?: string }[]) => {
+  return () => {
     if (to) clearTimeout(to);
     to = setTimeout(() => {
-      monaco.languages.typescript.typescriptDefaults.setExtraLibs(libs);
+      printDev("Setting extra libs");
+      monaco.languages.typescript.typescriptDefaults.setExtraLibs(extraLibs);
     }, 1000);
   };
 })();
@@ -17,7 +19,7 @@ const addExtraLib = (content: string, filePath: string) => {
     ...extraLibs,
     { content, filePath: monaco.Uri.file(filePath).toString(true) },
   ];
-  setExtraLibs(extraLibs);
+  setExtraLibs();
 };
 
 const addOrReplaceExtraLib = (content: string, filePath: string) => {
@@ -31,11 +33,12 @@ const removeExtraLib = (filePath: string) => {
     (lib) =>
       !(lib.filePath == filePath || lib.filePath.startsWith(`${filePath}/`)),
   );
-  setExtraLibs(extraLibs);
+  setExtraLibs();
 };
 
 const clearExtraLibs = () => {
-  setExtraLibs([]);
+  extraLibs = [];
+  setExtraLibs();
 };
 
 export { addExtraLib, removeExtraLib, clearExtraLibs, addOrReplaceExtraLib };

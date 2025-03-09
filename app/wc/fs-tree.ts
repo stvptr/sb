@@ -62,6 +62,23 @@ export const createFs = () => {
     emitFsChanges();
   };
 
+  const exists = (path: string) => {
+    const { parentDir, fileOrFolderName } = parsePath(path);
+
+    let dir = fs;
+    if (parentDir) {
+      for (let part of parentDir.split("/")) {
+        if (dir[part] === null) {
+          return false;
+        } else if (!dir[part]) {
+          return false;
+        }
+        dir = dir[part];
+      }
+    }
+    return dir[fileOrFolderName] !== undefined;
+  };
+
   const clear = () => {
     fs = {};
     emitFsChanges();
@@ -69,6 +86,7 @@ export const createFs = () => {
 
   return {
     add,
+    exists,
     rm,
     clear,
     getTree: () => fs,
